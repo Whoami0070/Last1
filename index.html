@@ -1,106 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WalletConnect with Approve Example</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.6.6/dist/umd/index.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WalletConnect v2 Approve</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
 </head>
 <body>
-  <h1>Connect Your Wallet</h1>
-
-  <!-- Button to connect wallet -->
+  <h1>Conne2ct Wallet & Approve</h1>
   <button id="connectButton">Connect Wallet</button>
   <p id="status">Not connected</p>
   <button id="approveButton" style="display:none;">Approve Tokens</button>
 
-  <script>
-    let web3;
+  <script type="module">
+    import EthereumProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider/dist/esm/index.js";
+
     let provider;
-    let accounts;
+    let web3;
+    let accounts = [];
 
-    // Define WalletConnect Provider
-    const walletConnectProvider = new WalletConnectProvider({
-      infuraId: "YOUR_INFURA_ID", // You can get this from https://infura.io/
-    });
+    const connectWallet = async () => {
+      provider = await EthereumProvider.init({
+        projectId: "YOUR_PROJECT_ID", // Get it from https://cloud.walletconnect.com
+        chains: [1], // Mainnet
+        showQrModal: true
+      });
 
-    // Check if WalletConnect is installed or MetaMask
-    function checkIfWalletIsInstalled() {
-      if (window.ethereum) {
-        web3 = new Web3(window.ethereum);
-        console.log("MetaMask detected");
-        return true;
-      } else if (walletConnectProvider) {
-        web3 = new Web3(walletConnectProvider);
-        console.log("WalletConnect detected");
-        return true;
-      }
-      return false;
-    }
+      await provider.enable();
+      web3 = new Web3(provider);
+      accounts = await web3.eth.getAccounts();
 
-    // Connect wallet function
-    async function connectWallet() {
-      if (!checkIfWalletIsInstalled()) {
-        alert("Please install MetaMask or Trust Wallet!");
-        return;
-      }
+      document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
+      document.getElementById("connectButton").style.display = "none";
+      document.getElementById("approveButton").style.display = "inline-block";
+    };
 
-      if (window.ethereum) {
-        // If MetaMask is detected
-        try {
-          accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-          web3 = new Web3(window.ethereum);
-          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-          document.getElementById("connectButton").style.display = "none";
-          document.getElementById("approveButton").style.display = "inline-block";
-        } catch (err) {
-          console.error("Error connecting to MetaMask:", err);
+    const approveTokens = async () => {
+      const tokenAddress = "0xTokenAddress"; // замените на нужный токен
+      const spender = "0xSpenderAddress";   // кто получит право тратить токены
+
+      const abi = [
+        {
+          constant: false,
+          inputs: [
+            { name: "_spender", type: "address" },
+            { name: "_value", type: "uint256" }
+          ],
+          name: "approve",
+          outputs: [{ name: "", type: "bool" }],
+          type: "function"
         }
-      } else {
-        // If WalletConnect is used
-        walletConnectProvider.enable().then(() => {
-          accounts = walletConnectProvider.accounts;
-          web3 = new Web3(walletConnectProvider);
-          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-          document.getElementById("connectButton").style.display = "none";
-          document.getElementById("approveButton").style.display = "inline-block";
-        }).catch(err => {
-          console.error("Error connecting to WalletConnect:", err);
-        });
-      }
-    }
+      ];
 
-    // Function to approve tokens (dummy implementation for now)
-    async function approveTokens() {
-      if (!accounts || !accounts[0]) {
-        alert("Wallet is not connected!");
-        return;
-      }
-      
+      const tokenContract = new web3.eth.Contract(abi, tokenAddress);
+      const maxUint = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
       try {
-        // Here we would interact with a smart contract to approve tokens
-        console.log("Approving tokens for account:", accounts[0]);
-
-        // Simulate the approve process
-        // Example contract interaction (replace with actual contract details)
-        const contractAddress = "0xYourContractAddress";
-        const tokenAddress = "0xYourTokenAddress";
-        const spenderAddress = "0xSpenderAddress";
-        const amount = web3.utils.toWei("100", "ether"); // Example amount to approve
-
-        // This is a mock, replace with actual contract call
-        console.log(`Approving ${amount} tokens to ${spenderAddress}`);
-
-        // Normally: contract.methods.approve(spenderAddress, amount).send({ from: accounts[0] });
-
-        alert("Tokens approved!");
+        await tokenContract.methods.approve(spender, maxUint).send({ from: accounts[0] });
+        alert("Approve successful!");
       } catch (err) {
-        console.error("Error approving tokens:", err);
+        console.error("Approve error:", err);
+        alert("Approve failed");
       }
-    }
+    };
 
-    // Button event listeners
     document.getElementById("connectButton").addEventListener("click", connectWallet);
     document.getElementById("approveButton").addEventListener("click", approveTokens);
   </script>

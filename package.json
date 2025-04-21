@@ -7,6 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "@walletconnect/client": "^1.8.0",
     "@walletconnect/ethereum-provider": "^2.20.0",
     "@walletconnect/qrcode-modal": "^1.8.0",
     "@walletconnect/web3-provider": "^1.8.0",
@@ -18,5 +19,9 @@
   },
   "author": "",
   "license": "ISC",
-  "keywords": []
+  "keywords": [],
+  "devDependencies": {
+    "webpack": "^5.99.6",
+    "webpack-cli": "^6.0.1"
+  }
 }

